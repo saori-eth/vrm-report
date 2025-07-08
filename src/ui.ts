@@ -101,6 +101,25 @@ function displayStats(stats: any) {
   
   const sections = [
     {
+      title: 'Model Stats',
+      data: {
+        meshCount: stats.meshes.count,
+        totalVertices: stats.meshes.totalVertices,
+        totalFaces: stats.meshes.totalFaces,
+        materialCount: stats.materials.count,
+        textureCount: stats.textures.count,
+        humanoidBones: stats.humanoid.bonesCount
+      },
+      fields: [
+        { key: 'meshCount', label: 'Mesh Count' },
+        { key: 'totalVertices', label: 'Total Vertices', format: (v: any) => v.toLocaleString() },
+        { key: 'totalFaces', label: 'Total Faces', format: (v: any) => v.toLocaleString() },
+        { key: 'materialCount', label: 'Material Count' },
+        { key: 'textureCount', label: 'Texture Count' },
+        { key: 'humanoidBones', label: 'Humanoid Bones' }
+      ]
+    },
+    {
       title: 'Metadata',
       data: stats.meta,
       fields: [
@@ -125,23 +144,6 @@ function displayStats(stats: any) {
         { key: 'creditNotation', label: 'Credit Notation' },
         { key: 'allowRedistribution', label: 'Redistribution', format: (v: any) => v ? 'Allowed' : 'Not Allowed' },
         { key: 'modification', label: 'Modification' }
-      ]
-    },
-    {
-      title: 'Model Stats',
-      data: {
-        ...stats.meshes,
-        ...stats.materials,
-        ...stats.textures,
-        humanoidBones: stats.humanoid.bonesCount
-      },
-      fields: [
-        { key: 'count', label: 'Mesh Count' },
-        { key: 'totalVertices', label: 'Total Vertices', format: (v: any) => v.toLocaleString() },
-        { key: 'totalFaces', label: 'Total Faces', format: (v: any) => v.toLocaleString() },
-        { key: 'count', label: 'Material Count' },
-        { key: 'count', label: 'Texture Count' },
-        { key: 'humanoidBones', label: 'Humanoid Bones' }
       ]
     },
     {

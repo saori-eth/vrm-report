@@ -12,6 +12,7 @@ let currentVRM: VRM | null = null;
 let placeholderMesh: THREE.Mesh | null = null;
 let particles: THREE.Points | null = null;
 let floor: THREE.Mesh | null = null;
+let loadingSpinner: THREE.Group | null = null;
 
 function initThreeJS() {
   const canvas = document.getElementById('scene') as HTMLCanvasElement;
@@ -155,6 +156,14 @@ function animate() {
     placeholderMesh.rotation.y += 0.01;
   }
   
+  if (loadingSpinner) {
+    loadingSpinner.rotation.y += 0.02;
+    loadingSpinner.children.forEach((ring, index) => {
+      ring.rotation.z += 0.01 * (index + 1);
+      ring.rotation.y += 0.005 * (index + 1);
+    });
+  }
+  
   if (particles) {
     particles.rotation.y += 0.0002;
     const positions = particles.geometry.attributes.position.array as Float32Array;
@@ -172,54 +181,105 @@ function animate() {
   renderer.render(scene, camera);
 }
 
-export async function loadVRM(file: File) {
-  const loader = new GLTFLoader();
-  loader.register((parser) => new VRMLoaderPlugin(parser));
+function createLoadingSpinner() {
+  loadingSpinner = new THREE.Group();
   
-  const url = URL.createObjectURL(file);
+  // Create rings
+  const ringGeometry = new THREE.TorusGeometry(0.5, 0.05, 8, 32);
+  const material1 = new THREE.MeshBasicMaterial({ color: 0x3b82f6 });
+  const material2 = new THREE.MeshBasicMaterial({ color: 0x60a5fa });
+  const material3 = new THREE.MeshBasicMaterial({ color: 0x93bbfc });
   
-  try {
-    const gltf = await loader.loadAsync(url);
-    const vrm = gltf.userData.vrm as VRM;
-    
-    if (placeholderMesh) {
-      scene.remove(placeholderMesh);
-      placeholderMesh = null;
-    }
-    
-    if (currentVRM) {
-      scene.remove(currentVRM.scene);
-      currentVRM.scene.traverse((obj) => {
-        if ((obj as any).geometry) (obj as any).geometry.dispose();
-        if ((obj as any).material) {
-          if (Array.isArray((obj as any).material)) {
-            (obj as any).material.forEach((mat: THREE.Material) => mat.dispose());
-          } else {
-            (obj as any).material.dispose();
-          }
-        }
-      });
-    }
-    
-    currentVRM = vrm;
-    scene.add(vrm.scene);
-    
-    // Rotate VRM to face forward
-    vrm.scene.rotation.y = Math.PI;
-    
-    vrm.scene.traverse((obj) => {
-      obj.castShadow = true;
-      obj.receiveShadow = true;
+  const ring1 = new THREE.Mesh(ringGeometry, material1);
+  const ring2 = new THREE.Mesh(ringGeometry, material2);
+  const ring3 = new THREE.Mesh(ringGeometry, material3);
+  
+  ring2.rotation.x = Math.PI / 3;
+  ring3.rotation.x = -Math.PI / 3;
+  
+  loadingSpinner.add(ring1);
+  loadingSpinner.add(ring2);
+  loadingSpinner.add(ring3);
+  
+  loadingSpinner.position.y = 1;
+  scene.add(loadingSpinner);
+}
+
+function removeLoadingSpinner() {
+  if (loadingSpinner) {
+    scene.remove(loadingSpinner);
+    loadingSpinner.children.forEach(child => {
+      if ((child as THREE.Mesh).geometry) (child as THREE.Mesh).geometry.dispose();
+      if ((child as THREE.Mesh).material) {
+        const material = (child as THREE.Mesh).material as THREE.Material;
+        material.dispose();
+      }
     });
-    
-    const stats = extractVRMStats(vrm);
-    
-    window.dispatchEvent(new CustomEvent('avatarLoaded', { detail: stats }));
-    
-  } catch (error) {
-    console.error('Error loading VRM:', error);
-    alert('Failed to load VRM file. Please ensure it\'s a valid VRM file.');
+    loadingSpinner = null;
   }
+}
+
+export async function loadVRM(file: File) {
+  // Show loading spinner
+  if (placeholderMesh) {
+    scene.remove(placeholderMesh);
+    placeholderMesh = null;
+  }
+  createLoadingSpinner();
+  
+  // Load VRM asynchronously
+  setTimeout(async () => {
+    const loader = new GLTFLoader();
+    loader.register((parser) => new VRMLoaderPlugin(parser));
+    
+    const url = URL.createObjectURL(file);
+    
+    try {
+      const gltf = await loader.loadAsync(url);
+      const vrm = gltf.userData.vrm as VRM;
+      
+      // Remove loading spinner
+      removeLoadingSpinner();
+      
+      if (currentVRM) {
+        scene.remove(currentVRM.scene);
+        currentVRM.scene.traverse((obj) => {
+          if ((obj as any).geometry) (obj as any).geometry.dispose();
+          if ((obj as any).material) {
+            if (Array.isArray((obj as any).material)) {
+              (obj as any).material.forEach((mat: THREE.Material) => mat.dispose());
+            } else {
+              (obj as any).material.dispose();
+            }
+          }
+        });
+      }
+      
+      currentVRM = vrm;
+      scene.add(vrm.scene);
+      
+      // Rotate VRM to face forward
+      vrm.scene.rotation.y = Math.PI;
+      
+      vrm.scene.traverse((obj) => {
+        obj.castShadow = true;
+        obj.receiveShadow = true;
+      });
+      
+      const stats = extractVRMStats(vrm);
+      
+      window.dispatchEvent(new CustomEvent('avatarLoaded', { detail: stats }));
+      
+      URL.revokeObjectURL(url);
+      
+    } catch (error) {
+      console.error('Error loading VRM:', error);
+      removeLoadingSpinner();
+      // Show placeholder again on error
+      addPlaceholder();
+      alert('Failed to load VRM file. Please ensure it\'s a valid VRM file.');
+    }
+  }, 10); // Small delay to ensure UI updates
 }
 
 function extractVRMStats(vrm: VRM) {
