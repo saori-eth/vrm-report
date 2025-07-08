@@ -204,6 +204,9 @@ export async function loadVRM(file: File) {
     currentVRM = vrm;
     scene.add(vrm.scene);
     
+    // Rotate VRM to face forward
+    vrm.scene.rotation.y = Math.PI;
+    
     vrm.scene.traverse((obj) => {
       obj.castShadow = true;
       obj.receiveShadow = true;

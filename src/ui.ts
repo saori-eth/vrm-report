@@ -4,28 +4,31 @@ const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
 export function initUI() {
   const uploadPrompt = document.getElementById('uploadPrompt')!;
-  const dragArea = document.getElementById('dragArea')!;
   const uploadButton = document.getElementById('uploadButton')!;
   const fileInput = document.getElementById('fileInput') as HTMLInputElement;
   const statsPanel = document.getElementById('statsPanel')!;
   const statsContent = document.getElementById('statsContent')!;
   const closeStats = document.getElementById('closeStats')!;
   const showStatsButton = document.getElementById('showStatsButton')!;
+  const dropOverlay = document.getElementById('dropOverlay')!;
   
+  // Desktop drag and drop
   if (!isTouchDevice) {
     let dragCounter = 0;
     
     document.body.addEventListener('dragenter', (e) => {
       e.preventDefault();
       dragCounter++;
-      dragArea.classList.add('drag-over');
+      if (dragCounter === 1) {
+        dropOverlay.classList.add('active');
+      }
     });
     
     document.body.addEventListener('dragleave', (e) => {
       e.preventDefault();
       dragCounter--;
       if (dragCounter === 0) {
-        dragArea.classList.remove('drag-over');
+        dropOverlay.classList.remove('active');
       }
     });
     
@@ -36,7 +39,7 @@ export function initUI() {
     document.body.addEventListener('drop', (e) => {
       e.preventDefault();
       dragCounter = 0;
-      dragArea.classList.remove('drag-over');
+      dropOverlay.classList.remove('active');
       
       const files = Array.from(e.dataTransfer?.files || []);
       const vrmFile = files.find(file => file.name.toLowerCase().endsWith('.vrm'));
@@ -49,9 +52,12 @@ export function initUI() {
     });
   }
   
-  uploadButton.addEventListener('click', () => {
-    fileInput.click();
-  });
+  // Mobile file upload
+  if (uploadButton) {
+    uploadButton.addEventListener('click', () => {
+      fileInput.click();
+    });
+  }
   
   fileInput.addEventListener('change', (e) => {
     const file = (e.target as HTMLInputElement).files?.[0];

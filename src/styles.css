@@ -21,6 +21,23 @@ body {
   touch-action: none;
 }
 
+.drop-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(circle at center, rgba(59, 130, 246, 0.2), transparent);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+  z-index: 5;
+}
+
+.drop-overlay.active {
+  opacity: 1;
+}
+
 #uploadPrompt {
   position: fixed;
   top: 0;
@@ -32,10 +49,28 @@ body {
   justify-content: center;
   pointer-events: none;
   z-index: 10;
+}
+
+.desktop-prompt, .mobile-prompt {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
   animation: fadeIn 0.3s ease-out;
 }
 
-#uploadPrompt > div {
+.desktop-prompt {
+  position: fixed;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: rgba(31, 41, 55, 0.8);
+  padding: 1.5rem 2rem;
+  border-radius: 0.5rem;
+  backdrop-filter: blur(8px);
+}
+
+.mobile-prompt {
   background-color: rgba(31, 41, 55, 0.9);
   padding: 2rem;
   border-radius: 0.5rem;
@@ -43,40 +78,29 @@ body {
   pointer-events: auto;
 }
 
-#dragArea {
-  border: 2px dashed #6b7280;
-  border-radius: 0.5rem;
-  padding: 3rem;
-  text-align: center;
-  transition: all 0.3s ease;
-  min-width: 300px;
-}
-
-#dragArea.drag-over {
-  border-color: #3b82f6;
-  background-color: rgba(59, 130, 246, 0.1);
-}
-
-#dragArea svg {
-  width: 4rem;
-  height: 4rem;
-  margin: 0 auto 1rem;
+.desktop-prompt svg, .mobile-prompt svg {
+  width: 3rem;
+  height: 3rem;
+  margin-bottom: 0.75rem;
   color: #9ca3af;
 }
 
-#dragArea p {
-  margin: 0 0 0.5rem 0;
+.desktop-prompt p, .mobile-prompt p {
+  margin: 0 0 1rem 0;
+  font-size: 1rem;
+  color: #e5e7eb;
 }
 
-#dragArea p:first-of-type {
-  font-size: 1.125rem;
-  margin-bottom: 0.5rem;
+@media (pointer: coarse) {
+  .mobile-prompt {
+    display: flex;
+  }
 }
 
-#dragArea p:nth-of-type(2) {
-  font-size: 0.875rem;
-  color: #9ca3af;
-  margin-bottom: 1rem;
+@media (pointer: fine) {
+  .desktop-prompt {
+    display: flex;
+  }
 }
 
 #uploadButton {
