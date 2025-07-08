@@ -11,6 +11,7 @@ export function initUI() {
   const closeStats = document.getElementById('closeStats')!;
   const showStatsButton = document.getElementById('showStatsButton')!;
   const dropOverlay = document.getElementById('dropOverlay')!;
+  const loadNewButton = document.getElementById('loadNewButton')!;
   
   // Desktop drag and drop
   if (!isTouchDevice) {
@@ -59,10 +60,17 @@ export function initUI() {
     });
   }
   
+  // Load new button for mobile
+  loadNewButton.addEventListener('click', () => {
+    fileInput.click();
+  });
+  
   fileInput.addEventListener('change', (e) => {
     const file = (e.target as HTMLInputElement).files?.[0];
       if (file && file.name.toLowerCase().endsWith('.vrm')) {
       handleFileUpload(file);
+      // Reset file input so the same file can be selected again
+      (e.target as HTMLInputElement).value = '';
     } else if (file) {
       alert('Please select a valid VRM file');
     }
@@ -82,6 +90,7 @@ export function initUI() {
     uploadPrompt.classList.add('hidden');
     statsPanel.classList.add('visible');
     showStatsButton.classList.add('visible');
+    loadNewButton.classList.add('visible');
     displayStats(e.detail);
   });
 }

@@ -304,3 +304,40 @@ body {
 .show-stats-button.visible {
   display: flex;
 }
+
+.load-new-button {
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  background-color: rgba(31, 41, 55, 0.9);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0.75rem 1.25rem;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.3s ease;
+  z-index: 15;
+}
+
+.load-new-button:hover {
+  background-color: rgba(31, 41, 55, 1);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.load-new-button svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.load-new-button.visible {
+  display: flex;
+}
+
+@media (pointer: fine) {
+  .load-new-button.visible {
+    display: none;
+  }
+}
