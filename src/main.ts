@@ -10,12 +10,15 @@ let renderer: THREE.WebGLRenderer;
 let controls: OrbitControls;
 let currentVRM: VRM | null = null;
 let placeholderMesh: THREE.Mesh | null = null;
+let particles: THREE.Points | null = null;
+let floor: THREE.Mesh | null = null;
 
 function initThreeJS() {
   const canvas = document.getElementById('scene') as HTMLCanvasElement;
   
   scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x1a1a2e);
+  scene.background = new THREE.Color(0x0a0a1f);
+  scene.fog = new THREE.Fog(0x0a0a1f, 5, 20);
   
   camera = new THREE.PerspectiveCamera(
     50,
@@ -34,24 +37,41 @@ function initThreeJS() {
   renderer.setPixelRatio(window.devicePixelRatio);
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.2;
   
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+  const ambientLight = new THREE.AmbientLight(0x4a5568, 1.2);
   scene.add(ambientLight);
   
-  const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-  directionalLight.position.set(1, 2, 3);
+  const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2);
+  directionalLight.position.set(2, 3, 2);
   directionalLight.castShadow = true;
   directionalLight.shadow.mapSize.width = 2048;
   directionalLight.shadow.mapSize.height = 2048;
+  directionalLight.shadow.camera.near = 0.1;
+  directionalLight.shadow.camera.far = 10;
+  directionalLight.shadow.camera.left = -3;
+  directionalLight.shadow.camera.right = 3;
+  directionalLight.shadow.camera.top = 3;
+  directionalLight.shadow.camera.bottom = -3;
   scene.add(directionalLight);
+  
+  const fillLight = new THREE.DirectionalLight(0x9bb2ff, 0.5);
+  fillLight.position.set(-2, 1, -2);
+  scene.add(fillLight);
   
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.05;
   controls.target.set(0, 1, 0);
+  controls.maxDistance = 10;
+  controls.minDistance = 1;
+  controls.maxPolarAngle = Math.PI * 0.8;
   controls.update();
   
   addPlaceholder();
+  addFloor();
+  addParticles();
   
   window.addEventListener('resize', onWindowResize);
   
@@ -77,12 +97,71 @@ function onWindowResize() {
   renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
+function addFloor() {
+  const floorGeometry = new THREE.PlaneGeometry(20, 20);
+  const floorMaterial = new THREE.MeshStandardMaterial({
+    color: 0x1a1a2e,
+    transparent: true,
+    opacity: 0.8,
+    roughness: 0.8,
+    metalness: 0.2
+  });
+  floor = new THREE.Mesh(floorGeometry, floorMaterial);
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.y = -0.01;
+  floor.receiveShadow = true;
+  scene.add(floor);
+  
+  const gridHelper = new THREE.GridHelper(20, 20, 0x4a5568, 0x2a2a3e);
+  gridHelper.position.y = 0.01;
+  scene.add(gridHelper);
+}
+
+function addParticles() {
+  const particleCount = 200;
+  const geometry = new THREE.BufferGeometry();
+  const positions = new Float32Array(particleCount * 3);
+  const sizes = new Float32Array(particleCount);
+  
+  for (let i = 0; i < particleCount; i++) {
+    positions[i * 3] = (Math.random() - 0.5) * 10;
+    positions[i * 3 + 1] = Math.random() * 5;
+    positions[i * 3 + 2] = (Math.random() - 0.5) * 10;
+    sizes[i] = Math.random() * 0.05 + 0.02;
+  }
+  
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+  
+  const material = new THREE.PointsMaterial({
+    color: 0x88ccff,
+    size: 0.05,
+    transparent: true,
+    opacity: 0.6,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    sizeAttenuation: true
+  });
+  
+  particles = new THREE.Points(geometry, material);
+  scene.add(particles);
+}
+
 function animate() {
   requestAnimationFrame(animate);
   
   if (placeholderMesh) {
     placeholderMesh.rotation.x += 0.01;
     placeholderMesh.rotation.y += 0.01;
+  }
+  
+  if (particles) {
+    particles.rotation.y += 0.0002;
+    const positions = particles.geometry.attributes.position.array as Float32Array;
+    for (let i = 0; i < positions.length; i += 3) {
+      positions[i + 1] += Math.sin(Date.now() * 0.001 + i) * 0.002;
+    }
+    particles.geometry.attributes.position.needsUpdate = true;
   }
   
   if (currentVRM) {
