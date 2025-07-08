@@ -1,14 +1,13 @@
 import { defineConfig } from 'vite';
-import basicSSL from '@vitejs/plugin-basic-ssl';
 
 export default defineConfig({
-  plugins: [basicSSL()],
+  plugins: [],
   publicDir: 'public',
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
   },
   server: {
-    https: true,
+    https: false,
   },
 });

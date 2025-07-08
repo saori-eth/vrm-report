@@ -385,3 +385,33 @@ body {
     display: none;
   }
 }
+
+.github-link {
+  position: fixed;
+  bottom: 1rem;
+  left: 1rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  background-color: rgba(31, 41, 55, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #9ca3af;
+  transition: all 0.3s ease;
+  z-index: 15;
+  text-decoration: none;
+}
+
+.github-link:hover {
+  background-color: rgba(31, 41, 55, 1);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: white;
+  transform: scale(1.05);
+}
+
+.github-link svg {
+  width: 1.5rem;
+  height: 1.5rem;
+}
