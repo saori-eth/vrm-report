@@ -38,13 +38,14 @@ function initThreeJS() {
   renderer.setPixelRatio(window.devicePixelRatio);
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.2;
+  renderer.toneMapping = THREE.LinearToneMapping;
+  renderer.toneMappingExposure = 1.0;
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
   
-  const ambientLight = new THREE.AmbientLight(0x4a5568, 1.2);
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
   scene.add(ambientLight);
   
-  const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2);
+  const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
   directionalLight.position.set(2, 3, 2);
   directionalLight.castShadow = true;
   directionalLight.shadow.mapSize.width = 2048;
@@ -55,9 +56,11 @@ function initThreeJS() {
   directionalLight.shadow.camera.right = 3;
   directionalLight.shadow.camera.top = 3;
   directionalLight.shadow.camera.bottom = -3;
+  directionalLight.shadow.bias = -0.0005;
+  directionalLight.shadow.normalBias = 0.02;
   scene.add(directionalLight);
   
-  const fillLight = new THREE.DirectionalLight(0x9bb2ff, 0.5);
+  const fillLight = new THREE.DirectionalLight(0xffffff, 0.3);
   fillLight.position.set(-2, 1, -2);
   scene.add(fillLight);
   
@@ -219,6 +222,45 @@ function removeLoadingSpinner() {
   }
 }
 
+// Progressive loading with minimal blocking
+async function cleanupPreviousVRM() {
+  if (!currentVRM) return;
+  
+  const objectsToDispose: any[] = [];
+  currentVRM.scene.traverse((obj) => {
+    if ((obj as any).geometry || (obj as any).material) {
+      objectsToDispose.push(obj);
+    }
+  });
+  
+  scene.remove(currentVRM.scene);
+  
+  // Dispose in chunks
+  const chunkSize = 10;
+  for (let i = 0; i < objectsToDispose.length; i += chunkSize) {
+    const chunk = objectsToDispose.slice(i, i + chunkSize);
+    
+    // Process chunk in next frame
+    await new Promise(resolve => {
+      requestAnimationFrame(() => {
+        chunk.forEach(obj => {
+          if (obj.geometry) obj.geometry.dispose();
+          if (obj.material) {
+            if (Array.isArray(obj.material)) {
+              obj.material.forEach((mat: THREE.Material) => mat.dispose());
+            } else {
+              obj.material.dispose();
+            }
+          }
+        });
+        resolve(undefined);
+      });
+    });
+  }
+  
+  currentVRM = null;
+}
+
 export async function loadVRM(file: File) {
   // Show loading spinner
   if (placeholderMesh) {
@@ -227,59 +269,99 @@ export async function loadVRM(file: File) {
   }
   createLoadingSpinner();
   
-  // Load VRM asynchronously
-  setTimeout(async () => {
-    const loader = new GLTFLoader();
-    loader.register((parser) => new VRMLoaderPlugin(parser));
+  // Start cleanup in parallel if needed
+  const cleanupPromise = cleanupPreviousVRM();
+  
+  // Read file in chunks to avoid blocking
+  const arrayBuffer = await file.arrayBuffer();
+  const blob = new Blob([arrayBuffer], { type: file.type });
+  const url = URL.createObjectURL(blob);
+  
+  // Create loader
+  const loader = new GLTFLoader();
+  loader.register((parser) => new VRMLoaderPlugin(parser));
+  
+  // Set up texture loading to be non-blocking
+  const loadingManager = new THREE.LoadingManager();
+  let texturesLoaded = 0;
+  let totalTextures = 0;
+  
+  loadingManager.onStart = () => {
+    totalTextures++;
+  };
+  
+  loadingManager.onLoad = () => {
+    texturesLoaded++;
+  };
+  
+  loader.manager = loadingManager;
+  
+  try {
+    // Wait for cleanup to finish
+    await cleanupPromise;
     
-    const url = URL.createObjectURL(file);
-    
-    try {
-      const gltf = await loader.loadAsync(url);
-      const vrm = gltf.userData.vrm as VRM;
-      
-      // Remove loading spinner
-      removeLoadingSpinner();
-      
-      if (currentVRM) {
-        scene.remove(currentVRM.scene);
-        currentVRM.scene.traverse((obj) => {
-          if ((obj as any).geometry) (obj as any).geometry.dispose();
-          if ((obj as any).material) {
-            if (Array.isArray((obj as any).material)) {
-              (obj as any).material.forEach((mat: THREE.Material) => mat.dispose());
-            } else {
-              (obj as any).material.dispose();
-            }
+    // Load GLTF with progressive texture loading
+    await new Promise<void>((resolve, reject) => {
+      loader.load(
+        url,
+        async (gltf) => {
+          const vrm = gltf.userData.vrm as VRM;
+          currentVRM = vrm;
+          
+          // Add to scene immediately but invisible
+          vrm.scene.visible = false;
+          scene.add(vrm.scene);
+          
+          // Rotate VRM to face forward
+          vrm.scene.rotation.y = Math.PI;
+          
+          // Process materials and shadows in chunks
+          const objects: THREE.Object3D[] = [];
+          vrm.scene.traverse((obj) => objects.push(obj));
+          
+          const chunkSize = 5;
+          for (let i = 0; i < objects.length; i += chunkSize) {
+            await new Promise(resolve => {
+              requestAnimationFrame(() => {
+                const chunk = objects.slice(i, i + chunkSize);
+                chunk.forEach(obj => {
+                  obj.castShadow = true;
+                  obj.receiveShadow = true;
+                });
+                resolve(undefined);
+              });
+            });
           }
-        });
-      }
-      
-      currentVRM = vrm;
-      scene.add(vrm.scene);
-      
-      // Rotate VRM to face forward
-      vrm.scene.rotation.y = Math.PI;
-      
-      vrm.scene.traverse((obj) => {
-        obj.castShadow = true;
-        obj.receiveShadow = true;
-      });
-      
-      const stats = extractVRMStats(vrm);
-      
-      window.dispatchEvent(new CustomEvent('avatarLoaded', { detail: stats }));
-      
-      URL.revokeObjectURL(url);
-      
-    } catch (error) {
-      console.error('Error loading VRM:', error);
-      removeLoadingSpinner();
-      // Show placeholder again on error
-      addPlaceholder();
-      alert('Failed to load VRM file. Please ensure it\'s a valid VRM file.');
-    }
-  }, 10); // Small delay to ensure UI updates
+          
+          // Extract stats while still loading
+          const stats = extractVRMStats(vrm);
+          
+          // Make visible and remove spinner in same frame
+          requestAnimationFrame(() => {
+            vrm.scene.visible = true;
+            removeLoadingSpinner();
+            window.dispatchEvent(new CustomEvent('avatarLoaded', { detail: stats }));
+            URL.revokeObjectURL(url);
+            resolve();
+          });
+        },
+        // Progress callback
+        (xhr) => {
+          // Keep animation running during load
+        },
+        (error) => {
+          reject(error);
+        }
+      );
+    });
+    
+  } catch (error) {
+    console.error('Error loading VRM:', error);
+    removeLoadingSpinner();
+    addPlaceholder();
+    alert('Failed to load VRM file. Please ensure it\'s a valid VRM file.');
+    URL.revokeObjectURL(url);
+  }
 }
 
 function extractVRMStats(vrm: VRM) {
