@@ -294,26 +294,27 @@ function extractVRMStats(vrm: VRM) {
   };
   
   if (vrm.meta) {
+    const meta = vrm.meta as any;
     stats.meta = {
-      name: vrm.meta.name || 'Unknown',
-      version: vrm.meta.version || 'Unknown',
-      authors: vrm.meta.authors || [],
-      copyrightInformation: vrm.meta.copyrightInformation || '',
-      contactInformation: vrm.meta.contactInformation || '',
-      reference: vrm.meta.references || [],
-      thirdPartyLicenses: vrm.meta.thirdPartyLicenses || '',
-      thumbnailImage: vrm.meta.thumbnailImage || null,
-      licenseUrl: vrm.meta.licenseUrl || '',
-      avatarPermission: vrm.meta.avatarPermission || 'Unknown',
-      allowExcessivelyViolentUsage: vrm.meta.allowExcessivelyViolentUsage || false,
-      allowExcessivelySexualUsage: vrm.meta.allowExcessivelySexualUsage || false,
-      commercialUsage: vrm.meta.commercialUsage || 'Unknown',
-      allowPoliticalOrReligiousUsage: vrm.meta.allowPoliticalOrReligiousUsage || false,
-      allowAntisocialOrHateUsage: vrm.meta.allowAntisocialOrHateUsage || false,
-      creditNotation: vrm.meta.creditNotation || 'Unknown',
-      allowRedistribution: vrm.meta.allowRedistribution || false,
-      modification: vrm.meta.modification || 'Unknown',
-      otherLicenseUrl: vrm.meta.otherLicenseUrl || ''
+      name: meta.name || 'Unknown',
+      version: meta.version || meta.metaVersion || 'Unknown',
+      authors: meta.authors || (meta.author ? [meta.author] : []),
+      copyrightInformation: meta.copyrightInformation || meta.copyright || '',
+      contactInformation: meta.contactInformation || meta.contactInformation || '',
+      reference: meta.references || meta.reference || [],
+      thirdPartyLicenses: meta.thirdPartyLicenses || meta.otherLicenseUrl || '',
+      thumbnailImage: meta.thumbnailImage || null,
+      licenseUrl: meta.licenseUrl || meta.otherLicenseUrl || '',
+      avatarPermission: meta.avatarPermission || meta.allowedUserName || 'Unknown',
+      allowExcessivelyViolentUsage: meta.allowExcessivelyViolentUsage !== undefined ? meta.allowExcessivelyViolentUsage : meta.violentUsage !== 'Disallow',
+      allowExcessivelySexualUsage: meta.allowExcessivelySexualUsage !== undefined ? meta.allowExcessivelySexualUsage : meta.sexualUsage !== 'Disallow',
+      commercialUsage: meta.commercialUsage || meta.commercialUsage || 'Unknown',
+      allowPoliticalOrReligiousUsage: meta.allowPoliticalOrReligiousUsage !== undefined ? meta.allowPoliticalOrReligiousUsage : true,
+      allowAntisocialOrHateUsage: meta.allowAntisocialOrHateUsage !== undefined ? meta.allowAntisocialOrHateUsage : false,
+      creditNotation: meta.creditNotation || 'Unknown',
+      allowRedistribution: meta.allowRedistribution !== undefined ? meta.allowRedistribution : false,
+      modification: meta.modification || 'Unknown',
+      otherLicenseUrl: meta.otherLicenseUrl || ''
     };
   }
   
