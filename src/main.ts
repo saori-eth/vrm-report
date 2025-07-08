@@ -13,6 +13,7 @@ let placeholderMesh: THREE.Mesh | null = null;
 let particles: THREE.Points | null = null;
 let floor: THREE.Mesh | null = null;
 let loadingSpinner: THREE.Group | null = null;
+let clock: THREE.Clock;
 
 function initThreeJS() {
   const canvas = document.getElementById('scene') as HTMLCanvasElement;
@@ -72,6 +73,8 @@ function initThreeJS() {
   controls.minDistance = 1;
   controls.maxPolarAngle = Math.PI * 0.8;
   controls.update();
+  
+  clock = new THREE.Clock();
   
   addPlaceholder();
   addFloor();
@@ -154,6 +157,8 @@ function addParticles() {
 function animate() {
   requestAnimationFrame(animate);
   
+  const deltaTime = clock.getDelta();
+  
   if (placeholderMesh) {
     placeholderMesh.rotation.x += 0.01;
     placeholderMesh.rotation.y += 0.01;
@@ -177,7 +182,7 @@ function animate() {
   }
   
   if (currentVRM) {
-    currentVRM.update(1 / 60);
+    currentVRM.update(deltaTime);
   }
   
   controls.update();
