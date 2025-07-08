@@ -282,6 +282,9 @@ export async function loadVRM(file: File) {
   const blob = new Blob([arrayBuffer], { type: file.type });
   const url = URL.createObjectURL(blob);
   
+  // Store file size for stats
+  const fileSize = file.size;
+  
   // Create loader
   const loader = new GLTFLoader();
   loader.register((parser) => new VRMLoaderPlugin(parser));
@@ -312,6 +315,9 @@ export async function loadVRM(file: File) {
         async (gltf) => {
           const vrm = gltf.userData.vrm as VRM;
           currentVRM = vrm;
+          
+          // Store file size on the VRM object
+          (currentVRM as any).fileSize = fileSize;
           
           // Add to scene immediately but invisible
           vrm.scene.visible = false;
@@ -377,7 +383,8 @@ function extractVRMStats(vrm: VRM) {
     textures: {},
     humanoid: {},
     expressions: {},
-    firstPerson: {}
+    firstPerson: {},
+    performance: {}
   };
   
   if (vrm.meta) {
@@ -408,37 +415,71 @@ function extractVRMStats(vrm: VRM) {
   let totalVertices = 0;
   let totalFaces = 0;
   let meshCount = 0;
-  const textureSet = new Set<THREE.Texture>();
-  const materialSet = new Set<THREE.Material>();
+  const textureMap = new Map<THREE.Texture, { type: string, size: string }>();
+  const materialMap = new Map<THREE.Material, { name: string, type: string }>();
+  const meshList: { name: string, vertices: number, faces: number }[] = [];
   
   vrm.scene.traverse((obj) => {
     if ((obj as THREE.Mesh).isMesh) {
       const mesh = obj as THREE.Mesh;
       meshCount++;
       
+      let vertices = 0;
+      let faces = 0;
+      
       if (mesh.geometry) {
         const positionAttribute = mesh.geometry.attributes.position;
         if (positionAttribute) {
-          totalVertices += positionAttribute.count;
+          vertices = positionAttribute.count;
+          totalVertices += vertices;
         }
         
         if (mesh.geometry.index) {
-          totalFaces += mesh.geometry.index.count / 3;
+          faces = mesh.geometry.index.count / 3;
+          totalFaces += faces;
         } else if (positionAttribute) {
-          totalFaces += positionAttribute.count / 3;
+          faces = positionAttribute.count / 3;
+          totalFaces += faces;
         }
       }
+      
+      meshList.push({
+        name: mesh.name || `Mesh_${meshCount}`,
+        vertices,
+        faces: Math.floor(faces)
+      });
       
       if (mesh.material) {
         const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
         materials.forEach(mat => {
-          materialSet.add(mat);
+          if (!materialMap.has(mat)) {
+            materialMap.set(mat, {
+              name: mat.name || 'Unnamed',
+              type: mat.type
+            });
+          }
           
-          if ((mat as any).map) textureSet.add((mat as any).map);
-          if ((mat as any).normalMap) textureSet.add((mat as any).normalMap);
-          if ((mat as any).emissiveMap) textureSet.add((mat as any).emissiveMap);
-          if ((mat as any).roughnessMap) textureSet.add((mat as any).roughnessMap);
-          if ((mat as any).metalnessMap) textureSet.add((mat as any).metalnessMap);
+          const checkTexture = (texture: THREE.Texture | null, type: string) => {
+            if (texture && !textureMap.has(texture)) {
+              const img = (texture as any).image;
+              let sizeStr = 'Unknown';
+              if (img) {
+                if (img.width && img.height) {
+                  sizeStr = `${img.width}x${img.height}`;
+                } else if (img.naturalWidth && img.naturalHeight) {
+                  sizeStr = `${img.naturalWidth}x${img.naturalHeight}`;
+                }
+              }
+              textureMap.set(texture, { type, size: sizeStr });
+            }
+          };
+          
+          checkTexture((mat as any).map, 'Diffuse');
+          checkTexture((mat as any).normalMap, 'Normal');
+          checkTexture((mat as any).emissiveMap, 'Emissive');
+          checkTexture((mat as any).roughnessMap, 'Roughness');
+          checkTexture((mat as any).metalnessMap, 'Metalness');
+          checkTexture((mat as any).aoMap, 'AO');
         });
       }
     }
@@ -447,15 +488,18 @@ function extractVRMStats(vrm: VRM) {
   stats.meshes = {
     count: meshCount,
     totalVertices,
-    totalFaces
+    totalFaces,
+    list: meshList
   };
   
   stats.materials = {
-    count: materialSet.size
+    count: materialMap.size,
+    list: Array.from(materialMap.values())
   };
   
   stats.textures = {
-    count: textureSet.size
+    count: textureMap.size,
+    list: Array.from(textureMap.values())
   };
   
   if (vrm.humanoid) {
@@ -463,6 +507,85 @@ function extractVRMStats(vrm: VRM) {
       bonesCount: Object.keys(vrm.humanoid.humanBones).length
     };
   }
+  
+  // Calculate performance stats
+  let totalTextureMemory = 0;
+  let totalGeometryMemory = 0;
+  let drawCalls = 0;
+  const uniqueMaterials = new Set<THREE.Material>();
+  const renderedMeshes: THREE.Mesh[] = [];
+  
+  vrm.scene.traverse((obj) => {
+    if ((obj as THREE.Mesh).isMesh) {
+      const mesh = obj as THREE.Mesh;
+      if (mesh.visible) {
+        renderedMeshes.push(mesh);
+        
+        // Count draw calls (one per material per mesh)
+        if (Array.isArray(mesh.material)) {
+          drawCalls += mesh.material.length;
+          mesh.material.forEach(mat => uniqueMaterials.add(mat));
+        } else if (mesh.material) {
+          drawCalls += 1;
+          uniqueMaterials.add(mesh.material);
+        }
+        
+        // Estimate geometry memory
+        if (mesh.geometry) {
+          const geo = mesh.geometry;
+          let geoMemory = 0;
+          
+          // Position attribute (3 floats per vertex)
+          if (geo.attributes.position) {
+            geoMemory += geo.attributes.position.count * 3 * 4; // 4 bytes per float
+          }
+          
+          // Normal attribute (3 floats per vertex)
+          if (geo.attributes.normal) {
+            geoMemory += geo.attributes.normal.count * 3 * 4;
+          }
+          
+          // UV attribute (2 floats per vertex)
+          if (geo.attributes.uv) {
+            geoMemory += geo.attributes.uv.count * 2 * 4;
+          }
+          
+          // Index buffer
+          if (geo.index) {
+            geoMemory += geo.index.count * 2; // 2 bytes per index (assuming Uint16)
+          }
+          
+          totalGeometryMemory += geoMemory;
+        }
+      }
+    }
+  });
+  
+  // Calculate texture memory
+  textureMap.forEach((info, texture) => {
+    const img = (texture as any).image;
+    if (img && img.width && img.height) {
+      // Assume RGBA format (4 bytes per pixel)
+      const textureMemory = img.width * img.height * 4;
+      totalTextureMemory += textureMemory;
+      
+      // Add mipmap memory (approximately 33% more)
+      if (texture.generateMipmaps) {
+        totalTextureMemory += Math.floor(textureMemory * 0.33);
+      }
+    }
+  });
+  
+  // File size (estimated from the original file)
+  const fileSize = (currentVRM as any).fileSize || 0;
+  
+  stats.performance = {
+    drawCalls,
+    textureMemory: totalTextureMemory,
+    geometryMemory: totalGeometryMemory,
+    estimatedVRAM: totalTextureMemory + totalGeometryMemory,
+    fileSize: fileSize
+  };
   
   if (vrm.expressionManager) {
     stats.expressions = {

@@ -104,6 +104,14 @@ function handleFileUpload(file: File) {
   loadVRM(file);
 }
 
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
 function displayStats(stats: any) {
   const statsContent = document.getElementById('statsContent')!;
   statsContent.innerHTML = '';
@@ -117,7 +125,12 @@ function displayStats(stats: any) {
         totalFaces: stats.meshes.totalFaces,
         materialCount: stats.materials.count,
         textureCount: stats.textures.count,
-        humanoidBones: stats.humanoid.bonesCount
+        humanoidBones: stats.humanoid.bonesCount,
+        drawCalls: stats.performance.drawCalls,
+        fileSize: stats.performance.fileSize,
+        textureMemory: stats.performance.textureMemory,
+        geometryMemory: stats.performance.geometryMemory,
+        estimatedVRAM: stats.performance.estimatedVRAM
       },
       fields: [
         { key: 'meshCount', label: 'Mesh Count' },
@@ -125,7 +138,38 @@ function displayStats(stats: any) {
         { key: 'totalFaces', label: 'Total Faces', format: (v: any) => v.toLocaleString() },
         { key: 'materialCount', label: 'Material Count' },
         { key: 'textureCount', label: 'Texture Count' },
-        { key: 'humanoidBones', label: 'Humanoid Bones' }
+        { key: 'humanoidBones', label: 'Humanoid Bones' },
+        { key: 'drawCalls', label: 'Draw Calls' },
+        { key: 'fileSize', label: 'Disk Usage', format: (v: any) => formatBytes(v) },
+        { key: 'textureMemory', label: 'Texture Memory', format: (v: any) => formatBytes(v) },
+        { key: 'geometryMemory', label: 'Geometry Memory', format: (v: any) => formatBytes(v) },
+        { key: 'estimatedVRAM', label: 'Est. VRAM Usage', format: (v: any) => formatBytes(v) }
+      ]
+    },
+    {
+      title: 'Meshes',
+      data: { meshes: stats.meshes.list },
+      fields: [],
+      custom: true
+    },
+    {
+      title: 'Materials',
+      data: { materials: stats.materials.list },
+      fields: [],
+      custom: true
+    },
+    {
+      title: 'Textures',
+      data: { textures: stats.textures.list },
+      fields: [],
+      custom: true
+    },
+    {
+      title: 'Expressions',
+      data: stats.expressions,
+      fields: [
+        { key: 'count', label: 'Expression Count' },
+        { key: 'names', label: 'Available Expressions', format: (v: any) => Array.isArray(v) ? v.join(', ') : 'None' }
       ]
     },
     {
@@ -155,14 +199,6 @@ function displayStats(stats: any) {
         { key: 'modification', label: 'Modification' }
       ]
     },
-    {
-      title: 'Expressions',
-      data: stats.expressions,
-      fields: [
-        { key: 'count', label: 'Expression Count' },
-        { key: 'names', label: 'Available Expressions', format: (v: any) => Array.isArray(v) ? v.join(', ') : 'None' }
-      ]
-    }
   ];
   
   sections.forEach(section => {
@@ -176,25 +212,198 @@ function displayStats(stats: any) {
     const fieldsEl = document.createElement('div');
     fieldsEl.className = 'stat-fields';
     
-    section.fields.forEach(field => {
-      const value = section.data[field.key];
-      if (value !== undefined && value !== null && value !== '') {
-        const fieldEl = document.createElement('div');
-        fieldEl.className = 'stat-field';
-        
-        const labelEl = document.createElement('span');
-        labelEl.className = 'stat-label';
-        labelEl.textContent = field.label + ':';
-        
-        const valueEl = document.createElement('span');
-        valueEl.className = 'stat-value';
-        valueEl.textContent = field.format ? field.format(value) : String(value);
-        
-        fieldEl.appendChild(labelEl);
-        fieldEl.appendChild(valueEl);
-        fieldsEl.appendChild(fieldEl);
+    if ((section as any).custom) {
+      // Custom rendering for detailed lists
+      const maxInitialItems = 3;
+      
+      if (section.data.meshes) {
+        const meshList = section.data.meshes as any[];
+        if (meshList.length > 0) {
+          const itemsContainer = document.createElement('div');
+          itemsContainer.className = 'items-container';
+          
+          meshList.forEach((mesh: any, index: number) => {
+            const meshEl = document.createElement('div');
+            meshEl.className = 'detail-item';
+            if (index >= maxInitialItems) {
+              meshEl.classList.add('hidden-item');
+            }
+            meshEl.innerHTML = `
+              <div class="detail-name">${mesh.name}</div>
+              <div class="detail-info">Vertices: ${mesh.vertices.toLocaleString()}, Faces: ${mesh.faces.toLocaleString()}</div>
+            `;
+            itemsContainer.appendChild(meshEl);
+          });
+          
+          fieldsEl.appendChild(itemsContainer);
+          
+          if (meshList.length > maxInitialItems) {
+            const seeMoreBtn = document.createElement('button');
+            seeMoreBtn.className = 'see-more-btn';
+            seeMoreBtn.textContent = `See ${meshList.length - maxInitialItems} more`;
+            
+            const seeLessBtn = document.createElement('button');
+            seeLessBtn.className = 'see-more-btn';
+            seeLessBtn.textContent = 'See less';
+            seeLessBtn.style.display = 'none';
+            
+            seeMoreBtn.addEventListener('click', () => {
+              const hiddenItems = itemsContainer.querySelectorAll('.hidden-item');
+              hiddenItems.forEach(item => item.classList.remove('hidden-item'));
+              seeMoreBtn.style.display = 'none';
+              seeLessBtn.style.display = 'block';
+            });
+            
+            seeLessBtn.addEventListener('click', () => {
+              meshList.forEach((mesh: any, index: number) => {
+                if (index >= maxInitialItems) {
+                  const item = itemsContainer.children[index] as HTMLElement;
+                  item.classList.add('hidden-item');
+                }
+              });
+              seeLessBtn.style.display = 'none';
+              seeMoreBtn.style.display = 'block';
+            });
+            
+            fieldsEl.appendChild(seeMoreBtn);
+            fieldsEl.appendChild(seeLessBtn);
+          }
+        } else {
+          fieldsEl.textContent = 'No meshes found';
+        }
+      } else if (section.data.materials) {
+        const materialList = section.data.materials as any[];
+        if (materialList.length > 0) {
+          const itemsContainer = document.createElement('div');
+          itemsContainer.className = 'items-container';
+          
+          materialList.forEach((mat: any, index: number) => {
+            const matEl = document.createElement('div');
+            matEl.className = 'detail-item';
+            if (index >= maxInitialItems) {
+              matEl.classList.add('hidden-item');
+            }
+            matEl.innerHTML = `
+              <div class="detail-name">${mat.name}</div>
+              <div class="detail-info">Type: ${mat.type}</div>
+            `;
+            itemsContainer.appendChild(matEl);
+          });
+          
+          fieldsEl.appendChild(itemsContainer);
+          
+          if (materialList.length > maxInitialItems) {
+            const seeMoreBtn = document.createElement('button');
+            seeMoreBtn.className = 'see-more-btn';
+            seeMoreBtn.textContent = `See ${materialList.length - maxInitialItems} more`;
+            
+            const seeLessBtn = document.createElement('button');
+            seeLessBtn.className = 'see-more-btn';
+            seeLessBtn.textContent = 'See less';
+            seeLessBtn.style.display = 'none';
+            
+            seeMoreBtn.addEventListener('click', () => {
+              const hiddenItems = itemsContainer.querySelectorAll('.hidden-item');
+              hiddenItems.forEach(item => item.classList.remove('hidden-item'));
+              seeMoreBtn.style.display = 'none';
+              seeLessBtn.style.display = 'block';
+            });
+            
+            seeLessBtn.addEventListener('click', () => {
+              materialList.forEach((mat: any, index: number) => {
+                if (index >= maxInitialItems) {
+                  const item = itemsContainer.children[index] as HTMLElement;
+                  item.classList.add('hidden-item');
+                }
+              });
+              seeLessBtn.style.display = 'none';
+              seeMoreBtn.style.display = 'block';
+            });
+            
+            fieldsEl.appendChild(seeMoreBtn);
+            fieldsEl.appendChild(seeLessBtn);
+          }
+        } else {
+          fieldsEl.textContent = 'No materials found';
+        }
+      } else if (section.data.textures) {
+        const textureList = section.data.textures as any[];
+        if (textureList.length > 0) {
+          const itemsContainer = document.createElement('div');
+          itemsContainer.className = 'items-container';
+          
+          textureList.forEach((tex: any, index: number) => {
+            const texEl = document.createElement('div');
+            texEl.className = 'detail-item';
+            if (index >= maxInitialItems) {
+              texEl.classList.add('hidden-item');
+            }
+            texEl.innerHTML = `
+              <div class="detail-name">${tex.type} Map</div>
+              <div class="detail-info">Size: ${tex.size}</div>
+            `;
+            itemsContainer.appendChild(texEl);
+          });
+          
+          fieldsEl.appendChild(itemsContainer);
+          
+          if (textureList.length > maxInitialItems) {
+            const seeMoreBtn = document.createElement('button');
+            seeMoreBtn.className = 'see-more-btn';
+            seeMoreBtn.textContent = `See ${textureList.length - maxInitialItems} more`;
+            
+            const seeLessBtn = document.createElement('button');
+            seeLessBtn.className = 'see-more-btn';
+            seeLessBtn.textContent = 'See less';
+            seeLessBtn.style.display = 'none';
+            
+            seeMoreBtn.addEventListener('click', () => {
+              const hiddenItems = itemsContainer.querySelectorAll('.hidden-item');
+              hiddenItems.forEach(item => item.classList.remove('hidden-item'));
+              seeMoreBtn.style.display = 'none';
+              seeLessBtn.style.display = 'block';
+            });
+            
+            seeLessBtn.addEventListener('click', () => {
+              textureList.forEach((tex: any, index: number) => {
+                if (index >= maxInitialItems) {
+                  const item = itemsContainer.children[index] as HTMLElement;
+                  item.classList.add('hidden-item');
+                }
+              });
+              seeLessBtn.style.display = 'none';
+              seeMoreBtn.style.display = 'block';
+            });
+            
+            fieldsEl.appendChild(seeMoreBtn);
+            fieldsEl.appendChild(seeLessBtn);
+          }
+        } else {
+          fieldsEl.textContent = 'No textures found';
+        }
       }
-    });
+    } else {
+      // Regular field rendering
+      section.fields.forEach(field => {
+        const value = section.data[field.key];
+        if (value !== undefined && value !== null && value !== '') {
+          const fieldEl = document.createElement('div');
+          fieldEl.className = 'stat-field';
+          
+          const labelEl = document.createElement('span');
+          labelEl.className = 'stat-label';
+          labelEl.textContent = field.label + ':';
+          
+          const valueEl = document.createElement('span');
+          valueEl.className = 'stat-value';
+          valueEl.textContent = field.format ? field.format(value) : String(value);
+          
+          fieldEl.appendChild(labelEl);
+          fieldEl.appendChild(valueEl);
+          fieldsEl.appendChild(fieldEl);
+        }
+      });
+    }
     
     sectionEl.appendChild(fieldsEl);
     statsContent.appendChild(sectionEl);
