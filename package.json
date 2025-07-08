@@ -13,6 +13,7 @@
   "description": "",
   "dependencies": {
     "@pixiv/three-vrm": "^3.4.2",
+    "@vercel/analytics": "^1.5.0",
     "@vitejs/plugin-basic-ssl": "^2.1.0",
     "three": "^0.178.0",
     "vite": "^6.3.5"

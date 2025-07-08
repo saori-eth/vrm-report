@@ -3,6 +3,9 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { VRMLoaderPlugin, VRM } from '@pixiv/three-vrm';
 import { initUI } from './ui';
+import { inject } from '@vercel/analytics';
+
+inject();
 
 let scene: THREE.Scene;
 let camera: THREE.PerspectiveCamera;
