@@ -8,6 +8,11 @@ A serverless web application for viewing and analyzing VRM avatar files with det
 - File picker support (mobile/tablet)
 - Real-time 3D preview with Three.js
 - Comprehensive VRM statistics display
+  - Geometry: mesh, vertex & face counts, rig/bone totals
+  - Rendering resources: draw-calls, material & texture counts (with max texture size)
+  - Memory footprint: disk size, texture + geometry VRAM estimates
+  - Facial rig: expression list & total count
+Metadata & licensing: author, version, usage and redistribution permissions
 - Session persistence with IndexedDB
 - Responsive design for all devices
 
@@ -23,7 +28,3 @@ npm run dev
 ```bash
 npm run build
 ```
-
-## Deployment
-
-The app is configured for deployment on Netlify or Vercel. Simply connect your GitHub repository to either platform for automatic deployments.
