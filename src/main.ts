@@ -606,5 +606,14 @@ function extractVRMStats(vrm: VRM) {
   return stats;
 }
 
+function updateVRMExpression(name: string, value: number) {
+  if (currentVRM && currentVRM.expressionManager) {
+    const expression = currentVRM.expressionManager.getExpression(name);
+    if (expression) {
+      expression.weight = value;
+    }
+  }
+}
+
 initThreeJS();
-initUI();
+initUI(updateVRMExpression);

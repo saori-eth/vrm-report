@@ -2,7 +2,13 @@ import { loadVRM } from './main';
 
 const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
-export function initUI() {
+let updateExpressionCallback: ((name: string, value: number) => void) | null = null;
+
+export function initUI(onUpdateExpression?: (name: string, value: number) => void) {
+  if (onUpdateExpression) {
+    updateExpressionCallback = onUpdateExpression;
+  }
+  
   const uploadPrompt = document.getElementById('uploadPrompt')!;
   const uploadButton = document.getElementById('uploadButton')!;
   const fileInput = document.getElementById('fileInput') as HTMLInputElement;
@@ -112,6 +118,100 @@ function formatBytes(bytes: number): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
+function renderExpressions(data: any): string {
+  if (!data || !data.names || data.names.length === 0) {
+    return '<div class="no-expressions">No expressions found</div>';
+  }
+  
+  const maxInitialItems = 3;
+  let html = '<div class="items-container expression-controls">';
+  
+  data.names.forEach((name: string, index: number) => {
+    const hiddenClass = index >= maxInitialItems ? 'hidden-item' : '';
+    html += `
+      <div class="expression-item ${hiddenClass}" style="${index >= maxInitialItems ? 'display: none;' : ''}">
+        <label class="expression-label">${name}</label>
+        <input 
+          type="range" 
+          class="expression-slider" 
+          min="0" 
+          max="1" 
+          step="0.01" 
+          value="0" 
+          data-expression-name="${name}"
+        />
+        <span class="expression-value">0.00</span>
+      </div>
+    `;
+  });
+  
+  html += '</div>';
+  
+  if (data.names.length > maxInitialItems) {
+    html += `
+      <button class="see-more-btn expression-see-more">See ${data.names.length - maxInitialItems} more</button>
+      <button class="see-more-btn expression-see-less" style="display: none;">See less</button>
+    `;
+  }
+  
+  // Attach event listeners after rendering
+  setTimeout(() => attachExpressionListeners(), 0);
+  
+  return html;
+}
+
+function attachExpressionListeners() {
+  // Attach listeners to sliders
+  const sliders = document.querySelectorAll('.expression-slider');
+  sliders.forEach(slider => {
+    const input = slider as HTMLInputElement;
+    const valueDisplay = input.nextElementSibling as HTMLSpanElement;
+    
+    input.addEventListener('input', (e) => {
+      const target = e.target as HTMLInputElement;
+      const value = parseFloat(target.value);
+      const expressionName = target.getAttribute('data-expression-name');
+      
+      // Update value display
+      valueDisplay.textContent = value.toFixed(2);
+      
+      // Call the callback if available
+      if (expressionName && updateExpressionCallback) {
+        updateExpressionCallback(expressionName, value);
+      }
+    });
+  });
+  
+  // Attach listeners to see more/less buttons
+  const seeMoreBtn = document.querySelector('.expression-see-more') as HTMLButtonElement;
+  const seeLessBtn = document.querySelector('.expression-see-less') as HTMLButtonElement;
+  const container = document.querySelector('.expression-controls') as HTMLElement;
+  
+  if (seeMoreBtn && seeLessBtn && container) {
+    seeMoreBtn.addEventListener('click', () => {
+      const hiddenItems = container.querySelectorAll('.hidden-item');
+      hiddenItems.forEach(item => {
+        item.classList.remove('hidden-item');
+        (item as HTMLElement).style.display = '';
+      });
+      seeMoreBtn.style.display = 'none';
+      seeLessBtn.style.display = 'block';
+    });
+    
+    seeLessBtn.addEventListener('click', () => {
+      const items = container.querySelectorAll('.expression-item');
+      items.forEach((item, index) => {
+        if (index >= 3) {
+          item.classList.add('hidden-item');
+          (item as HTMLElement).style.display = 'none';
+        }
+      });
+      seeLessBtn.style.display = 'none';
+      seeMoreBtn.style.display = 'block';
+    });
+  }
+}
+
 function displayStats(stats: any) {
   const statsContent = document.getElementById('statsContent')!;
   statsContent.innerHTML = '';
@@ -167,10 +267,8 @@ function displayStats(stats: any) {
     {
       title: 'Expressions',
       data: stats.expressions,
-      fields: [
-        { key: 'count', label: 'Expression Count' },
-        { key: 'names', label: 'Available Expressions', format: (v: any) => Array.isArray(v) ? v.join(', ') : 'None' }
-      ]
+      fields: [],
+      render: (data: any) => renderExpressions(data)
     },
     {
       title: 'Metadata',
@@ -212,7 +310,10 @@ function displayStats(stats: any) {
     const fieldsEl = document.createElement('div');
     fieldsEl.className = 'stat-fields';
     
-    if ((section as any).custom) {
+    if ((section as any).render) {
+      // Custom render function
+      fieldsEl.innerHTML = (section as any).render(section.data);
+    } else if ((section as any).custom) {
       // Custom rendering for detailed lists
       const maxInitialItems = 3;
       
