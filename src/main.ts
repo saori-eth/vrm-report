@@ -418,7 +418,7 @@ function extractVRMStats(vrm: VRM) {
   let totalVertices = 0;
   let totalFaces = 0;
   let meshCount = 0;
-  const textureMap = new Map<THREE.Texture, { type: string, size: string }>();
+  const textureMap = new Map<THREE.Texture, { type: string, size: string, texture?: THREE.Texture }>();
   const materialMap = new Map<THREE.Material, { name: string, type: string }>();
   const meshList: { name: string, vertices: number, faces: number }[] = [];
   
