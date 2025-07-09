@@ -212,6 +212,119 @@ function attachExpressionListeners() {
   }
 }
 
+function attachTextureListeners() {
+  const textureHeaders = document.querySelectorAll('.texture-header');
+  
+  textureHeaders.forEach(header => {
+    const toggleBtn = header.querySelector('.texture-toggle-btn') as HTMLButtonElement;
+    const textureItem = header.closest('.texture-item') as HTMLElement;
+    const textureId = header.getAttribute('data-texture-id');
+    const preview = document.getElementById(textureId!) as HTMLElement;
+    const canvas = preview?.querySelector('.texture-canvas') as HTMLCanvasElement;
+    const downloadBtn = preview?.querySelector('.texture-download-btn') as HTMLButtonElement;
+    
+    if (!toggleBtn || !preview || !canvas) return;
+    
+    toggleBtn.addEventListener('click', () => {
+      const isOpen = preview.style.display !== 'none';
+      
+      if (!isOpen) {
+        preview.style.display = 'block';
+        textureItem.classList.add('expanded');
+        
+        // Render texture if not already rendered
+        if (!canvas.getAttribute('data-rendered')) {
+          const textureData = (textureItem as any).textureData;
+          if (textureData && textureData.texture) {
+            renderTextureToCanvas(textureData.texture, canvas);
+            canvas.setAttribute('data-rendered', 'true');
+          }
+        }
+      } else {
+        preview.style.display = 'none';
+        textureItem.classList.remove('expanded');
+      }
+      
+      // Rotate arrow
+      toggleBtn.classList.toggle('rotated');
+    });
+    
+    if (downloadBtn) {
+      downloadBtn.addEventListener('click', () => {
+        const textureData = (textureItem as any).textureData;
+        if (textureData && canvas.getAttribute('data-rendered')) {
+          downloadCanvasAsImage(canvas, `${textureData.type}_texture.png`);
+        }
+      });
+    }
+  });
+}
+
+function renderTextureToCanvas(texture: any, canvas: HTMLCanvasElement) {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  
+  const image = texture.image;
+  if (!image) return;
+  
+  // Set canvas size to match image aspect ratio
+  const maxSize = 256;
+  let width = image.width || image.naturalWidth;
+  let height = image.height || image.naturalHeight;
+  
+  if (width > height) {
+    if (width > maxSize) {
+      height = (height / width) * maxSize;
+      width = maxSize;
+    }
+  } else {
+    if (height > maxSize) {
+      width = (width / height) * maxSize;
+      height = maxSize;
+    }
+  }
+  
+  canvas.width = width;
+  canvas.height = height;
+  
+  // Clear canvas
+  ctx.clearRect(0, 0, width, height);
+  
+  // Draw checkerboard background for transparency
+  const checkerSize = 10;
+  for (let y = 0; y < height; y += checkerSize) {
+    for (let x = 0; x < width; x += checkerSize) {
+      ctx.fillStyle = ((x / checkerSize + y / checkerSize) % 2 === 0) ? '#e0e0e0' : '#ffffff';
+      ctx.fillRect(x, y, checkerSize, checkerSize);
+    }
+  }
+  
+  // Draw the texture
+  try {
+    ctx.drawImage(image, 0, 0, width, height);
+  } catch (e) {
+    console.error('Failed to render texture:', e);
+    ctx.fillStyle = '#ff0000';
+    ctx.font = '14px Arial';
+    ctx.fillText('Failed to render', 10, height / 2);
+  }
+}
+
+function downloadCanvasAsImage(canvas: HTMLCanvasElement, filename: string) {
+  canvas.toBlob((blob) => {
+    if (!blob) return;
+    
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 'image/png');
+}
+
 function displayStats(stats: any) {
   const statsContent = document.getElementById('statsContent')!;
   statsContent.innerHTML = '';
@@ -431,22 +544,44 @@ function displayStats(stats: any) {
         const textureList = section.data.textures as any[];
         if (textureList.length > 0) {
           const itemsContainer = document.createElement('div');
-          itemsContainer.className = 'items-container';
+          itemsContainer.className = 'items-container texture-container';
           
           textureList.forEach((tex: any, index: number) => {
             const texEl = document.createElement('div');
-            texEl.className = 'detail-item';
+            texEl.className = 'detail-item texture-item';
             if (index >= maxInitialItems) {
               texEl.classList.add('hidden-item');
             }
+            
+            const textureId = `texture-${index}`;
             texEl.innerHTML = `
-              <div class="detail-name">${tex.type} Map</div>
-              <div class="detail-info">Size: ${tex.size}</div>
+              <div class="texture-header" data-texture-id="${textureId}">
+                <div class="texture-info">
+                  <div class="detail-name">${tex.type} Map</div>
+                  <div class="detail-info">Size: ${tex.size}</div>
+                </div>
+                <button class="texture-toggle-btn" aria-label="Toggle preview">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path d="M4 6L8 10L12 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                  </svg>
+                </button>
+              </div>
+              <div class="texture-preview" id="${textureId}" style="display: none;">
+                <canvas class="texture-canvas" width="256" height="256"></canvas>
+                <button class="texture-download-btn">Download</button>
+              </div>
             `;
+            
+            // Store texture data on the element
+            (texEl as any).textureData = tex;
+            
             itemsContainer.appendChild(texEl);
           });
           
           fieldsEl.appendChild(itemsContainer);
+          
+          // Attach texture interaction listeners
+          setTimeout(() => attachTextureListeners(), 0);
           
           if (textureList.length > maxInitialItems) {
             const seeMoreBtn = document.createElement('button');
@@ -470,6 +605,11 @@ function displayStats(stats: any) {
                 if (index >= maxInitialItems) {
                   const item = itemsContainer.children[index] as HTMLElement;
                   item.classList.add('hidden-item');
+                  // Also close any open previews
+                  const preview = item.querySelector('.texture-preview') as HTMLElement;
+                  if (preview) {
+                    preview.style.display = 'none';
+                  }
                 }
               });
               seeLessBtn.style.display = 'none';

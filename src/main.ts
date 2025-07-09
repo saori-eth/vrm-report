@@ -473,7 +473,7 @@ function extractVRMStats(vrm: VRM) {
                   sizeStr = `${img.naturalWidth}x${img.naturalHeight}`;
                 }
               }
-              textureMap.set(texture, { type, size: sizeStr });
+              textureMap.set(texture, { type, size: sizeStr, texture });
             }
           };
           
