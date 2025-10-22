@@ -3,10 +3,15 @@ import { loadVRM } from './main';
 const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
 let updateExpressionCallback: ((name: string, value: number) => void) | null = null;
+let playAnimationCallback: ((animationName: string) => void) | null = null;
+let currentAnimation = 'T-Pose';
 
-export function initUI(onUpdateExpression?: (name: string, value: number) => void) {
+export function initUI(onUpdateExpression?: (name: string, value: number) => void, onPlayAnimation?: (animationName: string) => void) {
   if (onUpdateExpression) {
     updateExpressionCallback = onUpdateExpression;
+  }
+  if (onPlayAnimation) {
+    playAnimationCallback = onPlayAnimation;
   }
   
   const uploadPrompt = document.getElementById('uploadPrompt')!;
@@ -99,6 +104,16 @@ export function initUI(onUpdateExpression?: (name: string, value: number) => voi
     loadNewButton.classList.add('visible');
     displayStats(e.detail);
   });
+
+  // Animation event listeners
+  window.addEventListener('animationChanged', (e: any) => {
+    currentAnimation = e.detail;
+    updateAnimationButtons();
+  });
+
+  window.addEventListener('animationError', (e: any) => {
+    alert(e.detail);
+  });
 }
 
 function handleFileUpload(file: File) {
@@ -116,6 +131,32 @@ function formatBytes(bytes: number): string {
   const sizes = ['B', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+function renderAnimationControls(): string {
+  const animations = ['T-Pose', 'Idle', 'Walk'];
+  
+  let html = '<div class="animation-controls">';
+  
+  animations.forEach((animation) => {
+    const isActive = currentAnimation === animation;
+    html += `
+      <button 
+        class="animation-btn ${isActive ? 'active' : ''}" 
+        data-animation="${animation}"
+      >
+        ${animation}
+      </button>
+    `;
+  });
+  
+  html += '</div>';
+  html += '<div class="animation-status">Current: <span class="animation-current">' + currentAnimation + '</span></div>';
+  
+  // Attach event listeners after rendering
+  setTimeout(() => attachAnimationListeners(), 0);
+  
+  return html;
 }
 
 function renderExpressions(data: any): string {
@@ -209,6 +250,41 @@ function attachExpressionListeners() {
       seeLessBtn.style.display = 'none';
       seeMoreBtn.style.display = 'block';
     });
+  }
+}
+
+function attachAnimationListeners() {
+  const animationButtons = document.querySelectorAll('.animation-btn');
+  
+  animationButtons.forEach(button => {
+    const btn = button as HTMLButtonElement;
+    const animationName = btn.getAttribute('data-animation');
+    
+    btn.addEventListener('click', () => {
+      if (animationName && playAnimationCallback) {
+        playAnimationCallback(animationName);
+      }
+    });
+  });
+}
+
+function updateAnimationButtons() {
+  const animationButtons = document.querySelectorAll('.animation-btn');
+  const statusElement = document.querySelector('.animation-current');
+  
+  animationButtons.forEach(button => {
+    const btn = button as HTMLButtonElement;
+    const animationName = btn.getAttribute('data-animation');
+    
+    if (animationName === currentAnimation) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
+  
+  if (statusElement) {
+    statusElement.textContent = currentAnimation;
   }
 }
 
@@ -330,6 +406,12 @@ function displayStats(stats: any) {
   statsContent.innerHTML = '';
   
   const sections = [
+    {
+      title: 'Animation',
+      data: {},
+      fields: [],
+      render: () => renderAnimationControls()
+    },
     {
       title: 'Model Stats',
       data: {

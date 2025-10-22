@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { VRMLoaderPlugin, VRM } from '@pixiv/three-vrm';
 import { initUI } from './ui';
+import { loadAnim, resetVRM, storeInitialVRMState } from './vrm';
 import { inject } from '@vercel/analytics';
 
 inject();
@@ -17,6 +18,8 @@ let particles: THREE.Points | null = null;
 let floor: THREE.Mesh | null = null;
 let loadingSpinner: THREE.Group | null = null;
 let clock: THREE.Clock;
+let mixer: THREE.AnimationMixer | null = null;
+let currentAction: THREE.AnimationAction | null = null;
 
 function initThreeJS() {
   const canvas = document.getElementById('scene') as HTMLCanvasElement;
@@ -188,6 +191,10 @@ function animate() {
     currentVRM.update(deltaTime);
   }
   
+  if (mixer) {
+    mixer.update(deltaTime);
+  }
+  
   controls.update();
   renderer.render(scene, camera);
 }
@@ -233,6 +240,22 @@ function removeLoadingSpinner() {
 // Progressive loading with minimal blocking
 async function cleanupPreviousVRM() {
   if (!currentVRM) return;
+  
+  // Stop and cleanup animations
+  if (currentAction) {
+    currentAction.stop();
+    currentAction = null;
+  }
+  if (mixer) {
+    mixer.stopAllAction();
+    if (currentVRM) {
+      mixer.uncacheRoot(currentVRM.scene);
+    }
+    mixer = null;
+  }
+  
+  // Notify UI that animation state is reset when loading new VRM
+  window.dispatchEvent(new CustomEvent('animationChanged', { detail: 'T-Pose' }));
   
   const objectsToDispose: any[] = [];
   currentVRM.scene.traverse((obj) => {
@@ -321,6 +344,9 @@ export async function loadVRM(file: File) {
           
           // Store file size on the VRM object
           (currentVRM as any).fileSize = fileSize;
+          
+          // Store initial bone transforms for T-pose reset
+          storeInitialVRMState(currentVRM);
           
           // Add to scene immediately but invisible
           vrm.scene.visible = false;
@@ -615,5 +641,107 @@ function updateVRMExpression(name: string, value: number) {
   }
 }
 
+async function playAnimation(animationName: string) {
+  if (!currentVRM) {
+    console.warn('No VRM loaded, cannot play animation');
+    return;
+  }
+  
+  try {
+    // Handle T-Pose first (no animation loading needed)
+    if (animationName === 'T-Pose') {
+      // Stop current animation
+      if (currentAction) {
+        currentAction.stop();
+        currentAction = null;
+      }
+      
+      // Clean up previous mixer
+      if (mixer) {
+        mixer.stopAllAction();
+        mixer.uncacheRoot(currentVRM.scene);
+        mixer = null;
+      }
+      
+      resetVRM(currentVRM);
+      window.dispatchEvent(new CustomEvent('animationChanged', { detail: 'T-Pose' }));
+      return;
+    }
+    
+    // For other animations, load and apply
+    console.log(`Loading animation: ${animationName}`);
+    
+    // Load animation first (before stopping current animation to prevent state corruption)
+    const animationUrl = `/${animationName.toLowerCase()}.fbx`;
+    const clip = await loadAnim(animationUrl, currentVRM);
+    
+    console.log(`Successfully loaded animation clip: ${clip.name}, duration: ${clip.duration}`);
+    
+    // Now stop current animation and create new mixer
+    if (currentAction) {
+      currentAction.stop();
+      currentAction = null;
+    }
+    
+    // Clean up previous mixer properly
+    if (mixer) {
+      mixer.stopAllAction();
+      mixer.uncacheRoot(currentVRM.scene);
+      mixer = null;
+    }
+    
+    // Create new mixer
+    mixer = new THREE.AnimationMixer(currentVRM.scene);
+    
+    // Create and play action
+    currentAction = mixer.clipAction(clip);
+    currentAction.setLoop(THREE.LoopRepeat, Infinity);
+    currentAction.play();
+    
+    console.log(`Animation ${animationName} started successfully`);
+    window.dispatchEvent(new CustomEvent('animationChanged', { detail: animationName }));
+  } catch (error) {
+    console.error(`Failed to load animation ${animationName}:`, error);
+    console.error('Error details:', error);
+    
+    // Fallback to T-pose on error
+    try {
+      if (currentAction) {
+        currentAction.stop();
+        currentAction = null;
+      }
+      if (mixer) {
+        mixer.stopAllAction();
+        mixer.uncacheRoot(currentVRM.scene);
+        mixer = null;
+      }
+      resetVRM(currentVRM);
+      window.dispatchEvent(new CustomEvent('animationChanged', { detail: 'T-Pose' }));
+    } catch (resetError) {
+      console.error('Failed to reset to T-pose:', resetError);
+    }
+    
+    window.dispatchEvent(new CustomEvent('animationError', { detail: `Failed to load ${animationName} animation: ${error instanceof Error ? error.message : 'Unknown error'}` }));
+  }
+}
+
+function stopAnimation() {
+  if (currentAction) {
+    currentAction.stop();
+    currentAction = null;
+  }
+  if (mixer) {
+    mixer.stopAllAction();
+    if (currentVRM) {
+      mixer.uncacheRoot(currentVRM.scene);
+    }
+    mixer = null;
+  }
+  if (currentVRM) {
+    resetVRM(currentVRM);
+  }
+  window.dispatchEvent(new CustomEvent('animationChanged', { detail: 'T-Pose' }));
+}
+
 initThreeJS();
-initUI(updateVRMExpression);
+initUI(updateVRMExpression, playAnimation);

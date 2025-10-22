@@ -618,3 +618,49 @@ body {
 .texture-download-btn:hover {
   background-color: #1d4ed8;
 }
+
+/* Animation Controls */
+.animation-controls {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.animation-btn {
+  padding: 8px 16px;
+  background: #2a2a3e;
+  color: white;
+  border: 1px solid #444;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s ease;
+}
+
+.animation-btn:hover {
+  background: #3a3a4e;
+  border-color: #555;
+}
+
+.animation-btn.active {
+  background: #3b82f6;
+  border-color: #3b82f6;
+  color: white;
+}
+
+.animation-btn.active:hover {
+  background: #2563eb;
+  border-color: #2563eb;
+}
+
+.animation-status {
+  font-size: 12px;
+  color: #888;
+  margin-top: 4px;
+}
+
+.animation-current {
+  color: #3b82f6;
+  font-weight: 500;
+}
