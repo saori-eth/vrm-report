@@ -1,0 +1,39 @@
+{
+  "name": "VRM Report - 3D Avatar File Analyzer",
+  "short_name": "VRM Report",
+  "description": "Free online VRM file analyzer and statistics viewer for 3D avatar files",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a1f",
+  "theme_color": "#0a0a1f",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon-16x16.png",
+      "sizes": "16x16",
+      "type": "image/png"
+    },
+    {
+      "src": "/favicon-32x32.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
+      "src": "/android-chrome-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "categories": ["graphics", "multimedia", "utilities"],
+  "lang": "en"
+}

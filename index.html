@@ -3,105 +3,196 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>VRM Report</title>
+    <title>VRM Report - VRM Avatar File Analyzer & Statistics Viewer | VRM Inspector Tool</title>
+    <meta name="description" content="Free online VRM file analyzer and statistics viewer. Upload VRM avatar files to view detailed VRM model stats including geometry, textures, materials, memory usage, and facial expressions. Works with VRoid and other VRM formats." />
+    <meta name="keywords" content="VRM file viewer, VRM analyzer, VRM avatar statistics, VRM inspector, VRoid model viewer, Three.js VRM tool, VRM file analysis, VRM metadata, VRM model stats" />
+    <meta name="author" content="VRM Report" />
+    <link rel="canonical" href="https://vrm-report.vercel.app/" />
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://vrm-report.vercel.app/" />
+    <meta property="og:title" content="VRM Report - VRM Avatar File Analyzer & Statistics Viewer" />
+    <meta property="og:description" content="Free online VRM file analyzer and statistics viewer. Upload VRM avatar files to view detailed VRM model stats including geometry, textures, materials, and more." />
+    <meta property="og:image" content="https://vrm-report.vercel.app/logo.png" />
+    <meta property="og:site_name" content="VRM Report" />
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="https://vrm-report.vercel.app/" />
+    <meta property="twitter:title" content="VRM Report - VRM Avatar File Analyzer & Statistics Viewer" />
+    <meta property="twitter:description" content="Free online VRM file analyzer and statistics viewer. Upload VRM avatar files to view detailed VRM model stats including geometry, textures, materials, and more." />
+    <meta property="twitter:image" content="https://vrm-report.vercel.app/logo.png" />
+    
+    <!-- Theme and mobile optimization -->
+    <meta name="theme-color" content="#0a0a1f" />
+    <meta name="msapplication-TileColor" content="#0a0a1f" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.json" />
+    
     <link rel="stylesheet" href="/src/styles.css" />
+    
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "VRM Report",
+      "alternateName": "VRM File Analyzer",
+      "description": "Free online VRM file analyzer and statistics viewer for VRM avatar files",
+      "url": "https://vrm-report.vercel.app/",
+      "applicationCategory": "MultimediaApplication",
+      "operatingSystem": "Web Browser",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "featureList": [
+        "VRM file upload and analysis",
+        "VRM avatar preview",
+        "Geometry statistics (mesh, vertex, face counts)",
+        "Texture and material analysis",
+        "Memory usage calculations",
+        "Facial expression detection",
+        "VRM metadata display",
+        "Cross-platform compatibility"
+      ],
+      "author": {
+        "@type": "Organization",
+        "name": "VRM Report"
+      },
+      "datePublished": "2024-01-01",
+      "dateModified": "2024-10-23",
+      "inLanguage": "en",
+      "isAccessibleForFree": true,
+      "browserRequirements": "Requires JavaScript and WebGL support"
+    }
+    </script>
   </head>
   <body>
-    <canvas id="scene"></canvas>
+    <header class="sr-only">
+      <h1>VRM Report - VRM Avatar File Analyzer</h1>
+    </header>
+    
+    <main>
+      <canvas id="scene" aria-label="VRM avatar 3D preview"></canvas>
 
-    <div id="dropOverlay" class="drop-overlay"></div>
+      <div id="dropOverlay" class="drop-overlay" aria-hidden="true"></div>
 
-    <div id="uploadPrompt">
-      <div id="desktopPrompt" class="desktop-prompt">
-        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-          ></path>
-        </svg>
-        <p>Drop VRM file anywhere</p>
-      </div>
-      <div id="mobilePrompt" class="mobile-prompt">
-        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-          ></path>
-        </svg>
-        <p>Tap to load VRM file</p>
-        <button id="uploadButton">Choose File</button>
-      </div>
-      <input type="file" id="fileInput" accept=".vrm" />
-    </div>
-
-    <button id="showStatsButton" class="show-stats-button">
-      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="2"
-          d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-        ></path>
-      </svg>
-      View Stats
-    </button>
-
-    <button id="loadNewButton" class="load-new-button">
-      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="2"
-          d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-        ></path>
-      </svg>
-      Load New VRM
-    </button>
-
-    <div id="statsPanel">
-      <div>
-        <div class="stats-header">
-          <h2>VRM Stats</h2>
-          <button id="closeStats">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M6 18L18 6M6 6l12 12"
-              ></path>
-            </svg>
-          </button>
+      <section id="uploadPrompt" aria-label="File upload area">
+        <div id="desktopPrompt" class="desktop-prompt">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" role="img">
+            <title>Upload icon</title>
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+            ></path>
+          </svg>
+          <p>Drop VRM file anywhere</p>
         </div>
-        <div id="statsContent"></div>
-      </div>
-    </div>
+        <div id="mobilePrompt" class="mobile-prompt">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" role="img">
+            <title>Upload icon</title>
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+            ></path>
+          </svg>
+          <p>Tap to load VRM file</p>
+          <button id="uploadButton" type="button">Choose VRM File</button>
+        </div>
+        <input type="file" id="fileInput" accept=".vrm" aria-label="Select VRM file to analyze" />
+      </section>
 
-    <a
-      href="https://github.com/saori-eth/vrm-report"
-      target="_blank"
-      class="github-link"
-      title="View on GitHub"
-    >
-      <svg viewBox="0 0 24 24" fill="currentColor">
-        <path
-          d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"
-        />
-      </svg>
-    </a>
+      <nav aria-label="VRM analysis tools">
+        <button id="showStatsButton" class="show-stats-button" type="button" aria-label="View VRM statistics and analysis">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" role="img">
+            <title>Statistics chart icon</title>
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+            ></path>
+          </svg>
+          View VRM Statistics
+        </button>
 
-    <a
-      href="https://www.opensourceavatars.com/en/gallery"
-      target="_blank"
-      class="cco-avatars-link"
-      title="CCO Avatars"
-    >
-      CCO Avatars
-    </a>
+        <button id="loadNewButton" class="load-new-button" type="button" aria-label="Load a new VRM file">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" role="img">
+            <title>Upload new file icon</title>
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+            ></path>
+          </svg>
+          Load New VRM File
+        </button>
+      </nav>
+
+      <aside id="statsPanel" aria-label="VRM file statistics" role="dialog" aria-hidden="true">
+        <div>
+          <header class="stats-header">
+            <h2>VRM File Analysis</h2>
+            <button id="closeStats" type="button" aria-label="Close statistics panel">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" role="img">
+                <title>Close icon</title>
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M6 18L18 6M6 6l12 12"
+                ></path>
+              </svg>
+            </button>
+          </header>
+          <div id="statsContent"></div>
+        </div>
+      </aside>
+    </main>
+
+    <footer>
+      <a
+        href="https://github.com/saori-eth/vrm-report"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="github-link"
+        title="View VRM Report source code on GitHub"
+        aria-label="View VRM Report source code on GitHub"
+      >
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" role="img">
+          <title>GitHub logo</title>
+          <path
+            d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"
+          />
+        </svg>
+      </a>
+
+      <a
+        href="https://www.opensourceavatars.com/en/gallery"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="cco-avatars-link"
+        title="Browse free CC0 VRM avatars for testing"
+        aria-label="Browse free CC0 VRM avatars for testing"
+      >
+        Free CC0 VRM Avatars
+      </a>
+    </footer>
 
     <script type="module" src="/src/main.ts"></script>
   </body>
